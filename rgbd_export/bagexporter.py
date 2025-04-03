@@ -37,6 +37,10 @@ def main():
                         help="path to exported data")
     parser.add_argument('-r', '--range', type=float, nargs=2,
                         help="time range in seconds since start of bag file")
+    parser.add_argument("--noraw", action="store_true",
+                        help="By default, the raw compressed image data is written directly to file " \
+                             "without conversion to/from numpy array. This can fail if the data format " \
+                             "is not supported by the imageio library. Use this option to turn this off.")
     parser.add_argument('--sync_queue_size', type=int, default=100,
                         help="queue size for synchronizer")
     parser.add_argument('--sync_slop', type=float, default=0.016,
@@ -51,6 +55,9 @@ def main():
 
     global bridge
     bridge = CvBridge()
+
+    global raw_compressed
+    raw_compressed = not args.noraw
 
     reader = rosbag2_py.SequentialReader()
     reader.open_uri(args.bagpath)
@@ -128,14 +135,20 @@ def on_sync(
     if type(msg_colour) == Image:
         img_colour = bridge.imgmsg_to_cv2(msg_colour, desired_encoding="rgb8")
     elif type(msg_colour) == CompressedImage:
-        img_colour = bridge.compressed_imgmsg_to_cv2(msg_colour, desired_encoding="rgb8")
+        if raw_compressed:
+            img_colour = bytes(msg_colour.data)
+        else:
+            img_colour = bridge.compressed_imgmsg_to_cv2(msg_colour, desired_encoding="rgb8")
     else:
         raise TypeError(f"unknown colour image type {type(msg_colour)}")
 
     if type(msg_depth) == Image:
         img_depth = bridge.imgmsg_to_cv2(msg_depth)
     elif type(msg_depth) == CompressedImage:
-        img_depth = bridge.compressed_imgmsg_to_cv2(msg_depth)
+        if raw_compressed:
+            img_depth = bytes(msg_depth.data)
+        else:
+            img_depth = bridge.compressed_imgmsg_to_cv2(msg_depth)
     else:
         raise TypeError(f"unknown depth image type {type(msg_colour)}")
 
@@ -145,13 +158,15 @@ def on_sync(
     # extrinsic matrix
     Twc = pose_to_matrix(msg_pose.pose) if msg_pose is not None else None
 
-    assert img_colour.shape[:2] == img_depth.shape[:2]
-
-    assert img_depth.dtype == np.uint16
+    if type(msg_colour) == type(msg_depth) == Image:
+        assert img_colour.shape[:2] == img_depth.shape[:2]
+        assert img_depth.dtype == np.uint16
 
     exporter.write_rgbd(
         img_colour,
         img_depth,
+        msg_info.width,
+        msg_info.height,
         K,
         msg_info.d,
         msg_colour.header.stamp.sec + msg_colour.header.stamp.nanosec * 1e-9,

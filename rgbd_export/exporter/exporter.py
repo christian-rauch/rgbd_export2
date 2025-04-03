@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 import numpy.typing as npt
 import abc
 
@@ -9,8 +9,10 @@ class Exporter(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def write_rgbd(self,
-                   colour: npt.ArrayLike,
-                   depth: npt.ArrayLike,
+                   colour: Union[npt.ArrayLike, bytes],
+                   depth: Union[npt.ArrayLike, bytes],
+                   width: int,
+                   height: int,
                    K: npt.ArrayLike,
                    distortion_coefficients: list[float],
                    stamp: float,
