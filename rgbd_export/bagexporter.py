@@ -144,8 +144,6 @@ def on_sync(
 
     assert img_depth.dtype == np.uint16
 
-    print(f"sync {msg_colour.header.stamp.sec}.{msg_colour.header.stamp.nanosec:09d}: colour {img_colour.shape}, depth {img_depth.shape}, K {K.shape}, T: {Twc.shape if Twc is not None else '∅'}")
-
     exporter.write_rgbd(
         img_colour,
         img_depth,
