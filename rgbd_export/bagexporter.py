@@ -8,6 +8,8 @@ from sensor_msgs.msg import Image, CompressedImage, CameraInfo
 from geometry_msgs.msg import PoseStamped
 from cv_bridge import CvBridge
 import numpy as np
+import os
+import tarfile
 
 from .bag_time_synchronizer import BagTimeSynchronizer
 from .conversion import pose_to_matrix
@@ -111,6 +113,9 @@ def main():
 
     # call the destructor to flush data
     del exporter
+
+    with tarfile.open(f"{args.export}.tar.gz", "w:gz") as tar:
+        tar.add(args.export, arcname=os.path.basename(args.export))
 
 def on_sync(
         msg_colour: Union[Image, CompressedImage],
