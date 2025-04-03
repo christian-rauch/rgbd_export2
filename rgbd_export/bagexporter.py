@@ -11,6 +11,7 @@ import numpy as np
 
 from .bag_time_synchronizer import BagTimeSynchronizer
 from .conversion import pose_to_matrix
+from .exporter.icl import ICLExporter
 
 
 def main():
@@ -25,6 +26,13 @@ def main():
                         help="camera info topic")
     parser.add_argument("-p", "--topic_pose", type=str,
                         help="camera pose topic")
+    parser.add_argument("-f", "--format", type=str,
+                        choices=["ICL"],
+                        required=True,
+                        help="export format")
+    parser.add_argument("-e", "--export", type=str,
+                        required=True,
+                        help="path to exported data")
     parser.add_argument('-r', '--range', type=float, nargs=2,
                         help="time range in seconds since start of bag file")
     parser.add_argument('--sync_queue_size', type=int, default=100,
@@ -32,6 +40,12 @@ def main():
     parser.add_argument('--sync_slop', type=float, default=0.016,
                         help="slop for synchronizer")
     args = parser.parse_args()
+
+    global exporter
+    if args.format == "ICL":
+        exporter = ICLExporter(export_path = args.export)
+    else:
+        raise ValueError(f"unknown export format '{args.format}'")
 
     global bridge
     bridge = CvBridge()
@@ -95,6 +109,9 @@ def main():
         msg = deserialize_message(data, topic_types[topic])
         sync.add_msg(msg, topic)
 
+    # call the destructor to flush data
+    del exporter
+
 def on_sync(
         msg_colour: Union[Image, CompressedImage],
         msg_depth: Union[Image, CompressedImage],
@@ -128,6 +145,15 @@ def on_sync(
     assert img_depth.dtype == np.uint16
 
     print(f"sync {msg_colour.header.stamp.sec}.{msg_colour.header.stamp.nanosec:09d}: colour {img_colour.shape}, depth {img_depth.shape}, K {K.shape}, T: {Twc.shape if Twc is not None else '∅'}")
+
+    exporter.write_rgbd(
+        img_colour,
+        img_depth,
+        K,
+        msg_info.d,
+        msg_colour.header.stamp.sec + msg_colour.header.stamp.nanosec * 1e-9,
+        Twc,
+    )
 
 if __name__ == '__main__':
     main()
