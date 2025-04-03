@@ -50,6 +50,9 @@ class ICLExporter(Exporter):
             fmt_colour = imghdr.what(None, h=colour)
             if fmt_colour is None:
                 raise RuntimeError("Cannot determine image format for colour data!")
+            # workaround: use "jpg" as file extension for "jpeg" format
+            if fmt_colour == "jpeg":
+                fmt_colour = "jpg"
             with open(fpath_colour.format(ext=fmt_colour), 'wb') as f:
                 f.write(colour)
         elif type(colour) is np.ndarray:
