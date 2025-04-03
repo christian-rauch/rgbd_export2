@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'exporter = rgbd_export.exporter:main'
+            'exporter = rgbd_export.bagexporter:main'
         ],
     },
 )
