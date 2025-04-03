@@ -37,6 +37,8 @@ def main():
                         help="path to exported data")
     parser.add_argument('-r', '--range', type=float, nargs=2,
                         help="time range in seconds since start of bag file")
+    parser.add_argument("-z", "--framerate", type=float,
+                        help="downsample the exported data to a lower framerate")
     parser.add_argument("--noraw", action="store_true",
                         help="By default, the raw compressed image data is written directly to file " \
                              "without conversion to/from numpy array. This can fail if the data format " \
@@ -58,6 +60,11 @@ def main():
 
     global raw_compressed
     raw_compressed = not args.noraw
+
+    global period
+    period = 1/args.framerate if args.framerate is not None and args.framerate > 0 else 0
+    global next_export_time
+    next_export_time = None
 
     reader = rosbag2_py.SequentialReader()
     reader.open_uri(args.bagpath)
@@ -130,6 +137,19 @@ def on_sync(
         msg_info: CameraInfo,
         msg_pose: Optional[PoseStamped] = None,
     ):
+
+    global next_export_time
+
+    stamp = msg_colour.header.stamp.sec + msg_colour.header.stamp.nanosec * 1e-9
+
+    if next_export_time is None:
+        next_export_time = stamp
+
+    if not (stamp > next_export_time):
+        return
+
+    next_export_time = next_export_time + period
+
     assert msg_colour.header.frame_id == msg_depth.header.frame_id == msg_info.header.frame_id
 
     if type(msg_colour) == Image:
@@ -169,7 +189,7 @@ def on_sync(
         msg_info.height,
         K,
         msg_info.d,
-        msg_colour.header.stamp.sec + msg_colour.header.stamp.nanosec * 1e-9,
+        stamp,
         Twc,
     )
 
