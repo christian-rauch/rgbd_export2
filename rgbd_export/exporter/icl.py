@@ -29,6 +29,10 @@ class ICLExporter(Exporter):
 
         os.makedirs(self.path_colour, exist_ok=True)
         os.makedirs(self.path_depth, exist_ok=True)
+        # create relative symlinks from "images" and "input" to "rgb" for compatibility
+        # with COLMAP for Gaussian Splatting and LangSplat data readers
+        os.symlink(self.folder_colour, os.path.join(self.path, "images"))
+        os.symlink(self.folder_colour, os.path.join(self.path, "input"))
 
         self.f_poses = open(os.path.join(self.path, "poses.gt.sim"), 'w', encoding="utf-8")
 
