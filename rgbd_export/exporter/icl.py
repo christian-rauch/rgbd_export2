@@ -6,7 +6,7 @@ import numpy as np
 import imageio.v3 as iio
 from datetime import datetime
 import yaml
-import imghdr
+import filetype
 
 from .exporter import Exporter
 
@@ -51,19 +51,16 @@ class ICLExporter(Exporter):
         fpath_depth = os.path.join(self.path_depth, f"{stamp_str}.{{ext}}")
 
         if type(colour) is bytes:
-            fmt_colour = imghdr.what(None, h=colour)
+            fmt_colour = filetype.guess_extension(colour)
             if fmt_colour is None:
                 raise RuntimeError("Cannot determine image format for colour data!")
-            # workaround: use "jpg" as file extension for "jpeg" format
-            if fmt_colour == "jpeg":
-                fmt_colour = "jpg"
             with open(fpath_colour.format(ext=fmt_colour), 'wb') as f:
                 f.write(colour)
         elif type(colour) is np.ndarray:
             iio.imwrite(fpath_colour.format(ext="jpg"), colour)
 
         if type(depth) is bytes:
-            fmt_depth = imghdr.what(None, h=depth)
+            fmt_depth = filetype.guess_extension(depth)
             if fmt_depth is None:
                 raise RuntimeError("Cannot determine image format for depth data!")
             with open(fpath_depth.format(ext=fmt_depth), 'wb') as f:
