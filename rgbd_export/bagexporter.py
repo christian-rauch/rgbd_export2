@@ -26,6 +26,8 @@ def main():
                         help="depth image topic")
     parser.add_argument('-i', '--topic_info', type=str,
                         help="camera info topic")
+    parser.add_argument('--topic_info_depth', type=str,
+                        help="depth camera info topic (for unregistered images)")
     parser.add_argument("-p", "--topic_pose", type=str,
                         help="camera pose topic")
     parser.add_argument("-f", "--format", type=str,
@@ -87,6 +89,9 @@ def main():
         args.topic_info,
     ]
 
+    if args.topic_info_depth is not None:
+        topics.append(args.topic_info_depth)
+
     if args.topic_pose is not None:
         topics.append(args.topic_pose)
 
@@ -135,6 +140,7 @@ def on_sync(
         msg_colour: Union[Image, CompressedImage],
         msg_depth: Union[Image, CompressedImage],
         msg_info: CameraInfo,
+        msg_info_depth: Optional[CameraInfo] = None,
         msg_pose: Optional[PoseStamped] = None,
     ):
 
@@ -150,7 +156,11 @@ def on_sync(
 
     next_export_time = next_export_time + period
 
-    assert msg_colour.header.frame_id == msg_depth.header.frame_id == msg_info.header.frame_id
+    if msg_info_depth is None:
+        assert msg_colour.header.frame_id == msg_depth.header.frame_id == msg_info.header.frame_id
+
+    if msg_info_depth is not None:
+        assert (msg_colour.header.frame_id == msg_info.header.frame_id) and (msg_depth.header.frame_id == msg_info_depth.header.frame_id)
 
     if type(msg_colour) == Image:
         img_colour = bridge.imgmsg_to_cv2(msg_colour, desired_encoding="rgb8")
