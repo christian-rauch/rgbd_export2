@@ -8,7 +8,7 @@ from datetime import datetime
 import yaml
 import filetype
 
-from .exporter import Exporter
+from .exporter import Exporter, Intrinsics
 
 
 class ICLExporter(Exporter):
@@ -36,14 +36,33 @@ class ICLExporter(Exporter):
 
         self.f_poses = open(os.path.join(self.path, "poses.gt.sim"), 'w', encoding="utf-8")
 
+    @staticmethod
+    def params_from_intrinsics(intrinsics: Intrinsics):
+        camera_params = dict()
+        camera_params['image_height'] = intrinsics.height
+        camera_params['image_width'] = intrinsics.width
+        camera_params['fx'] = float(intrinsics.K[0, 0])
+        camera_params['fy'] = float(intrinsics.K[1, 1])
+        camera_params['cx'] = float(intrinsics.K[0, 2])
+        camera_params['cy'] = float(intrinsics.K[1, 2])
+        camera_params['png_depth_scale'] = 1000
+
+        # OpenCV convention
+        k1 = intrinsics.distortion_coefficients[0]
+        k2 = intrinsics.distortion_coefficients[1]
+        k3 = intrinsics.distortion_coefficients[4]
+        p1 = intrinsics.distortion_coefficients[2]
+        p2 = intrinsics.distortion_coefficients[3]
+        camera_params['distortion'] = [k1, k2, p1, p2, k3]
+
+        return camera_params
+
     def write_rgbd(self,
                    colour: Union[npt.ArrayLike, bytes],
                    depth: Union[npt.ArrayLike, bytes],
-                   width: int,
-                   height: int,
-                   K: npt.ArrayLike,
-                   distortion_coefficients: list[float],
+                   intrinsics: Intrinsics,
                    stamp: float,
+                   intrinsics_depth: Optional[Intrinsics] = None,
                    T: Optional[npt.ArrayLike] = None,
                    ):
         stamp_str = datetime.fromtimestamp(stamp).strftime("%Y%m%d_%H%M%S_%f") + f"_{self.i}"
@@ -69,25 +88,15 @@ class ICLExporter(Exporter):
             iio.imwrite(fpath_depth.format(ext="png"), depth)
 
         if self.i == 0:
-            camera_params = dict()
-            camera_params['image_height'] = height
-            camera_params['image_width'] = width
-            camera_params['fx'] = float(K[0, 0])
-            camera_params['fy'] = float(K[1, 1])
-            camera_params['cx'] = float(K[0, 2])
-            camera_params['cy'] = float(K[1, 2])
-            camera_params['png_depth_scale'] = 1000
-
-            # OpenCV convention
-            k1 = distortion_coefficients[0]
-            k2 = distortion_coefficients[1]
-            k3 = distortion_coefficients[4]
-            p1 = distortion_coefficients[2]
-            p2 = distortion_coefficients[3]
-            camera_params['distortion'] = [k1, k2, p1, p2, k3]
+            metadata = {
+                'dataset_name': "icl",
+                'camera_params': ICLExporter.params_from_intrinsics(intrinsics),
+            }
+            if intrinsics_depth is not None:
+                metadata['camera_params_depth'] = ICLExporter.params_from_intrinsics(intrinsics_depth)
 
             with open(os.path.join(self.path, "icl.yaml"), 'w', encoding="utf-8") as f:
-                yaml.dump({'dataset_name': "icl", 'camera_params': camera_params}, f)
+                yaml.dump(metadata, f)
 
         if T is not None:
             self.f_poses.write(f"{T[0][0]:f} {T[0][1]:f} {T[0][2]:f} {T[0][3]:f}\n")

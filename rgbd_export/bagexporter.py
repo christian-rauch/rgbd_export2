@@ -13,6 +13,7 @@ import tarfile
 
 from .bag_time_synchronizer import BagTimeSynchronizer
 from .conversion import pose_to_matrix
+from. exporter.exporter import Intrinsics
 from .exporter.icl import ICLExporter
 
 
@@ -136,6 +137,14 @@ def main():
     with tarfile.open(f"{args.export}.tar.gz", "w:gz") as tar:
         tar.add(args.export, arcname=os.path.basename(args.export))
 
+def intrinsics_from_msg(msg_info: CameraInfo):
+    return Intrinsics(
+        width = msg_info.width,
+        height = msg_info.height,
+        K = msg_info.k.reshape(3, 3),
+        distortion_coefficients = msg_info.d.tolist(),
+    )
+
 def on_sync(
         msg_colour: Union[Image, CompressedImage],
         msg_depth: Union[Image, CompressedImage],
@@ -183,7 +192,12 @@ def on_sync(
         raise TypeError(f"unknown depth image type {type(msg_colour)}")
 
     # intrinsic matrix
-    K = msg_info.k.reshape(3, 3)
+    intrinsics = intrinsics_from_msg(msg_info)
+
+    if msg_info_depth is not None:
+        intrinsics_depth = intrinsics_from_msg(msg_info_depth)
+    else:
+        intrinsics_depth = None
 
     # extrinsic matrix
     Twc = pose_to_matrix(msg_pose.pose) if msg_pose is not None else None
@@ -195,11 +209,9 @@ def on_sync(
     exporter.write_rgbd(
         img_colour,
         img_depth,
-        msg_info.width,
-        msg_info.height,
-        K,
-        msg_info.d,
+        intrinsics,
         stamp,
+        intrinsics_depth,
         Twc,
     )
 
