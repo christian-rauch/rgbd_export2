@@ -2,6 +2,8 @@
 from typing import Union, Optional
 import argparse
 import rosbag2_py
+import rclpy
+import tf2_ros
 from rosidl_runtime_py.utilities import get_message
 from rclpy.serialization import deserialize_message
 from sensor_msgs.msg import Image, CompressedImage, CameraInfo
@@ -10,6 +12,7 @@ from cv_bridge import CvBridge
 import numpy as np
 import os
 import tarfile
+from scipy.spatial.transform import Rotation
 
 from .bag_time_synchronizer import BagTimeSynchronizer
 from .conversion import pose_to_matrix
@@ -83,6 +86,20 @@ def main():
         else:
             topic_types[topic.name] = message
 
+    global tf_buffer
+    tf_buffer = tf2_ros.Buffer(cache_time=rclpy.duration.Duration(nanoseconds=2**63-1))
+    tf_authority = "bagexporter"
+
+    # read static TFs
+    reader.set_filter(rosbag2_py.StorageFilter(topics=["/tf_static"]))
+    while reader.has_next():
+        topic, data, stamp_ns = reader.read_next()
+        msg = deserialize_message(data, topic_types[topic])
+        for transform in msg.transforms:
+            tf_buffer.set_transform_static(transform=transform, authority=tf_authority)
+    reader.reset_filter()
+    reader.seek(0)
+
     # check for valid topics
     topics = [
         args.topic_colour,
@@ -145,6 +162,17 @@ def intrinsics_from_msg(msg_info: CameraInfo):
         distortion_coefficients = msg_info.d.tolist(),
     )
 
+def transform_to_matrix(transform: tf2_ros.TransformStamped):
+    trans = transform.transform.translation
+    rot = transform.transform.rotation
+
+    R = Rotation.from_quat([rot.x, rot.y, rot.z, rot.w]).as_matrix()
+    T = np.eye(4)
+    T[:3, :3] = R
+    T[:3, 3] = [trans.x, trans.y, trans.z]
+
+    return T
+
 def on_sync(
         msg_colour: Union[Image, CompressedImage],
         msg_depth: Union[Image, CompressedImage],
@@ -154,6 +182,7 @@ def on_sync(
     ):
 
     global next_export_time
+    global tf_buffer
 
     stamp = msg_colour.header.stamp.sec + msg_colour.header.stamp.nanosec * 1e-9
 
@@ -202,6 +231,16 @@ def on_sync(
     # extrinsic matrix
     Twc = pose_to_matrix(msg_pose.pose) if msg_pose is not None else None
 
+    # transform from colour to depth camera optical frame
+    if msg_info_depth is not None:
+        Tcd = transform_to_matrix(tf_buffer.lookup_transform(
+                msg_colour.header.frame_id,
+                msg_depth.header.frame_id,
+                rclpy.time.Time.from_msg(msg_colour.header.stamp),
+              ))
+    else:
+        Tcd = None
+
     if type(msg_colour) == type(msg_depth) == Image:
         assert img_colour.shape[:2] == img_depth.shape[:2]
         assert img_depth.dtype == np.uint16
@@ -213,6 +252,7 @@ def on_sync(
         stamp,
         intrinsics_depth,
         Twc,
+        Tcd,
     )
 
 if __name__ == '__main__':

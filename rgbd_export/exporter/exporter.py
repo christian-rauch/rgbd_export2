@@ -24,5 +24,6 @@ class Exporter(metaclass=abc.ABCMeta):
                    stamp: float,
                    intrinsics_depth: Optional[Intrinsics] = None,
                    T: Optional[npt.ArrayLike] = None,
+                   Tcd: Optional[npt.ArrayLike] = None,
                    ):
         pass

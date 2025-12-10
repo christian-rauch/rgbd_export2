@@ -64,6 +64,7 @@ class ICLExporter(Exporter):
                    stamp: float,
                    intrinsics_depth: Optional[Intrinsics] = None,
                    T: Optional[npt.ArrayLike] = None,
+                   Tcd: Optional[npt.ArrayLike] = None,
                    ):
         stamp_str = datetime.fromtimestamp(stamp).strftime("%Y%m%d_%H%M%S_%f") + f"_{self.i}"
         fpath_colour = os.path.join(self.path_colour, f"frame_{stamp_str}.{{ext}}")
@@ -94,6 +95,8 @@ class ICLExporter(Exporter):
             }
             if intrinsics_depth is not None:
                 metadata['camera_params_depth'] = ICLExporter.params_from_intrinsics(intrinsics_depth)
+            if Tcd is not None:
+                metadata['Tcd'] = Tcd.ravel().tolist()
 
             with open(os.path.join(self.path, "icl.yaml"), 'w', encoding="utf-8") as f:
                 yaml.dump(metadata, f)
