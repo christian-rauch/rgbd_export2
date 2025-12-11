@@ -48,12 +48,9 @@ class ICLExporter(Exporter):
         camera_params['png_depth_scale'] = 1000
 
         # OpenCV convention
-        k1 = intrinsics.distortion_coefficients[0]
-        k2 = intrinsics.distortion_coefficients[1]
-        k3 = intrinsics.distortion_coefficients[4]
-        p1 = intrinsics.distortion_coefficients[2]
-        p2 = intrinsics.distortion_coefficients[3]
-        camera_params['distortion'] = [k1, k2, p1, p2, k3]
+        # https://docs.opencv.org/4.12.0/d9/d0c/group__calib3d.html
+        # (k1,k2,p1,p2[,k3[,k4,k5,k6[,s1,s2,s3,s4[,τx,τy]]]])
+        camera_params['distortion'] = intrinsics.distortion_coefficients
 
         return camera_params
 
