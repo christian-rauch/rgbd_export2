@@ -25,10 +25,13 @@ def main():
     parser.add_argument("bagpath", type=str,
                         help="path to bag file")
     parser.add_argument('-c', '--topic_colour', type=str,
+                        default="/camera/color/image_raw/compressed",
                         help="colour image topic")
     parser.add_argument('-d', '--topic_depth', type=str,
+                        default="/camera/depth/image_raw/compressed",
                         help="depth image topic")
     parser.add_argument('-i', '--topic_info', type=str,
+                        default="/camera/color/camera_info",
                         help="camera info topic")
     parser.add_argument('--topic_info_depth', type=str,
                         help="depth camera info topic (for unregistered images)")
@@ -36,7 +39,7 @@ def main():
                         help="camera pose topic")
     parser.add_argument("-f", "--format", type=str,
                         choices=["ICL"],
-                        required=True,
+                        default="ICL",
                         help="export format")
     parser.add_argument("-e", "--export", type=str,
                         required=True,
