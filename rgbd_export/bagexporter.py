@@ -10,7 +10,9 @@ from sensor_msgs.msg import Image, CompressedImage, CameraInfo
 from geometry_msgs.msg import PoseStamped
 from cv_bridge import CvBridge
 import numpy as np
+import imageio.v3 as iio
 import os
+import io
 import tarfile
 from scipy.spatial.transform import Rotation
 
@@ -52,6 +54,10 @@ def main():
                         help="By default, the raw compressed image data is written directly to file " \
                              "without conversion to/from numpy array. This can fail if the data format " \
                              "is not supported by the imageio library. Use this option to turn this off.")
+    parser.add_argument("--depth_pseudocolour", action="store_true",
+                        help="convert depth to a false pseudo colour image")
+    parser.add_argument("--depth_pseudocolour_max", type=float,
+                        help="maximum depth for pseudocolour computation")
     parser.add_argument('--sync_queue_size', type=int, default=100,
                         help="queue size for synchronizer")
     parser.add_argument('--sync_slop', type=float, default=0.016,
@@ -69,6 +75,16 @@ def main():
 
     global raw_compressed
     raw_compressed = not args.noraw
+
+    global depth_colourmap
+    global depth_pseudocolour_max
+    if args.depth_pseudocolour:
+        import matplotlib
+        depth_colourmap = matplotlib.colormaps["viridis"]
+        depth_pseudocolour_max = args.depth_pseudocolour_max
+    else:
+        depth_colourmap = None
+        depth_pseudocolour_max = None
 
     global period
     period = 1/args.framerate if args.framerate is not None and args.framerate > 0 else 0
@@ -248,12 +264,34 @@ def on_sync(
         assert img_colour.shape[:2] == img_depth.shape[:2]
         assert img_depth.dtype == np.uint16
 
+    if depth_colourmap is not None:
+        if type(img_depth) is bytes:
+            img_depth_mat = iio.imread(io.BytesIO(img_depth))
+        elif type(img_depth) is np.ndarray:
+            img_depth_mat = img_depth
+        else:
+            img_depth_mat = None
+
+        assert type(img_depth_mat) is np.ndarray
+        assert img_depth_mat.dtype == np.uint16
+
+        # We cannot infer the depth scale from the image message and currently
+        # only support 16bit unsigned integer. Hence, assume a 1000 units : 1 m mapping.
+        depth_scale = 1e3 # [units / m]
+
+        depth_max = (depth_pseudocolour_max * depth_scale) if depth_pseudocolour_max is not None else np.max(img_depth_mat)
+        depth_normalised = img_depth_mat.astype(np.float32) / depth_max
+        img_depth_colour = (depth_colourmap(depth_normalised)[..., :3] * 255).astype(np.uint8)
+    else:
+        img_depth_colour = None
+
     exporter.write_rgbd(
         img_colour,
         img_depth,
         intrinsics,
         stamp,
         intrinsics_depth,
+        img_depth_colour,
         Twc,
         Tcd,
     )

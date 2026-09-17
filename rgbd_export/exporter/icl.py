@@ -19,8 +19,10 @@ class ICLExporter(Exporter):
         # create folder layout
         self.folder_colour = "rgb"
         self.folder_depth = "depth"
+        self.folder_depth_pseudocolour = "depth_pseudocolour"
         self.path_colour = os.path.join(self.path, self.folder_colour)
         self.path_depth = os.path.join(self.path, self.folder_depth)
+        self.path_depth_pseudocolour = os.path.join(self.path, self.folder_depth_pseudocolour)
 
         if not os.path.exists(self.path):
             os.makedirs(self.path, exist_ok=True)
@@ -60,12 +62,19 @@ class ICLExporter(Exporter):
                    intrinsics: Intrinsics,
                    stamp: float,
                    intrinsics_depth: Optional[Intrinsics] = None,
+                   depth_pseudocolour: Optional[npt.ArrayLike] = None,
                    T: Optional[npt.ArrayLike] = None,
                    Tcd: Optional[npt.ArrayLike] = None,
                    ):
         stamp_str = datetime.fromtimestamp(stamp).strftime("%Y%m%d_%H%M%S_%f") + f"_{self.i}"
         fpath_colour = os.path.join(self.path_colour, f"frame_{stamp_str}.{{ext}}")
         fpath_depth = os.path.join(self.path_depth, f"{stamp_str}.{{ext}}")
+
+        if depth_pseudocolour is not None:
+            os.makedirs(self.path_depth_pseudocolour, exist_ok=True)
+            fpath_depth_pseudocolour = os.path.join(self.path_depth_pseudocolour, f"{stamp_str}.png")
+        else:
+            fpath_depth_pseudocolour = None
 
         if type(colour) is bytes:
             fmt_colour = filetype.guess_extension(colour)
@@ -84,6 +93,10 @@ class ICLExporter(Exporter):
                 f.write(depth)
         elif type(depth) is np.ndarray:
             iio.imwrite(fpath_depth.format(ext="png"), depth)
+
+        if depth_pseudocolour is not None:
+            assert fpath_depth_pseudocolour is not None
+            iio.imwrite(fpath_depth_pseudocolour, depth_pseudocolour)
 
         if self.i == 0:
             metadata = {

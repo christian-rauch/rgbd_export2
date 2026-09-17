@@ -23,6 +23,7 @@ class Exporter(metaclass=abc.ABCMeta):
                    intrinsics: Intrinsics,
                    stamp: float,
                    intrinsics_depth: Optional[Intrinsics] = None,
+                   depth_pseudocolour: Optional[npt.ArrayLike] = None,
                    T: Optional[npt.ArrayLike] = None,
                    Tcd: Optional[npt.ArrayLike] = None,
                    ):
